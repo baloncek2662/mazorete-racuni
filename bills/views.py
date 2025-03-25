@@ -3,9 +3,10 @@ import shutil
 import unicodedata
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.http import JsonResponse
 from .models import Person
 from .forms import SendBillsForm, PersonForm, FolderCreateForm, BillUploadForm
-from email_send import send_email
+from email_send import send_email, CONTENT_TEMPLATE
 
 
 BILLS_DIR = "racuni"
@@ -140,44 +141,58 @@ def confirm_send_bills(request):
     bill_assignments = request.session.get('bill_assignments', [])
     unassigned_bills = request.session.get('unassigned_bills', [])
 
+    # Process each assignment to include email preview
+    for assignment in bill_assignments:
+        person = assignment['person']
+
+        # Create email subject preview
+        assignment['email_subject'] = f"račun {month} 2025"
+
+        # Create email content preview
+        extras_str = ""
+        extras = None
+        if person['extras']:
+            extras = [x.strip() for x in person['extras'].split(',') if x.strip()]
+            if extras:
+                if len(extras) == 1:
+                    extras_str = f" in {extras[0]}"
+                elif len(extras) > 1:
+                    extras_str = f" {', '.join(extras[:-1])} in {extras[-1]}"
+
+        assignment['email_content'] = CONTENT_TEMPLATE.format(
+            month=month, extras_str=extras_str
+        )
+
+        # Identify duplicate bill filenames
+        filenames = {}
+        duplicate_filenames = set()
+
+        for bill_path in assignment['bills']:
+            filename = os.path.basename(bill_path)
+            if filename in filenames:
+                duplicate_filenames.add(filename)
+            else:
+                filenames[filename] = True
+
+        if duplicate_filenames:
+            # Convert set to list for JSON serialization
+            assignment['duplicate_bill_names'] = list(duplicate_filenames)
+
     if request.method == 'POST':
-        emails_sent = 0
-        for i, assignment in enumerate(bill_assignments):
+        # Store the selected email indices in session for processing
+        selected_indices = []
+        for i, _ in enumerate(bill_assignments):
             if f'send_{i}' in request.POST:
-                # Send email to this person
-                person = assignment['person']
-                bills = assignment['bills']
+                selected_indices.append(i)
 
-                # Extract extras if available
-                extras = None
-                if person['extras']:
-                    extras = [x.strip() for x in person['extras'].split(',') if x.strip()]
-
-                try:
-                    response = send_email(
-                        month=month,
-                        to_email=person['email'],
-                        bill_names=bills,
-                        extras=extras
-                    )
-                    if response:
-                        emails_sent += 1
-                except Exception as e:
-                    error_msg = f"Napaka pri pošiljanju računa za {person['email']}: {str(e)}"
-                    messages.error(request, error_msg)
-
-        # Clear session data
-        for key in ['month', 'bill_assignments', 'unassigned_bills']:
-            if key in request.session:
-                del request.session[key]
-
-        if emails_sent > 0:
-            plural = 'e' if emails_sent > 1 else ''
-            messages.success(request, f'Uspešno poslanih {emails_sent} email{plural}.')
+        if selected_indices:
+            request.session['selected_indices'] = selected_indices
+            return render(request, 'bills/sending_progress.html', {
+                'total_emails': len(selected_indices)
+            })
         else:
-            messages.warning(request, 'Ni bil poslan noben email.')
-
-        return redirect('bills:index')
+            messages.warning(request, 'Ni bil izbran noben email za pošiljanje.')
+            return redirect('bills:index')
 
     # Prepare data for template
     context = {
@@ -187,6 +202,84 @@ def confirm_send_bills(request):
     }
 
     return render(request, 'bills/confirm_send_bills.html', context)
+
+
+def send_email_async(request):
+    """Process one email at a time and return progress."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Dovoljena je samo POST metoda'}, status=405)
+
+    # Check if request is AJAX by looking for the X-Requested-With header
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return JsonResponse({'error': 'Ajax zahteva je potrebna'}, status=400)
+
+    # Get required session data
+    month = request.session.get('month')
+    bill_assignments = request.session.get('bill_assignments', [])
+    selected_indices = request.session.get('selected_indices', [])
+
+    if not month or not bill_assignments or not selected_indices:
+        return JsonResponse({'error': 'Manjkajo podatki seje'}, status=400)
+
+    # Get the current progress index
+    current_index = int(request.POST.get('current_index', 0))
+
+    if current_index >= len(selected_indices):
+        # We've processed all emails, clear session
+        for key in ['month', 'bill_assignments', 'unassigned_bills', 'selected_indices']:
+            if key in request.session:
+                del request.session[key]
+
+        return JsonResponse({
+            'success': True,
+            'completed': True,
+            'message': f'Vsi emaili uspešno poslani ({len(selected_indices)})'
+        })
+
+    # Get the assignment index to process
+    assignment_index = selected_indices[current_index]
+
+    if assignment_index >= len(bill_assignments):
+        return JsonResponse({'error': 'Neveljaven indeks dodelitve'}, status=400)
+
+    # Get the assignment and send the email
+    assignment = bill_assignments[assignment_index]
+    person = assignment['person']
+    bills = assignment['bills']
+
+    # Extract extras if available
+    extras = None
+    if person['extras']:
+        extras = [x.strip() for x in person['extras'].split(',') if x.strip()]
+
+    result = {
+        'success': False,
+        'completed': False,
+        'current_index': current_index,
+        'total': len(selected_indices),
+        'email': person['email']
+    }
+
+    try:
+        response = send_email(
+            month=month,
+            to_email=person['email'],
+            bill_names=bills,
+            extras=extras
+        )
+
+        if response:
+            result['success'] = True
+            result['message'] = f'Email poslan: {person["email"]}'
+        else:
+            result['message'] = f'Neuspešno pošiljanje na: {person["email"]}'
+    except Exception as e:
+        result['message'] = f'Napaka: {str(e)}'
+
+    # Increment for next request
+    result['next_index'] = current_index + 1
+
+    return JsonResponse(result)
 
 
 def manage_persons(request):

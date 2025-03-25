@@ -10,6 +10,11 @@ urlpatterns = [
         views.confirm_send_bills,
         name='confirm_send_bills'
     ),
+    path(
+        'send-email-async/',
+        views.send_email_async,
+        name='send_email_async'
+    ),
     path('persons/', views.manage_persons, name='manage_persons'),
     path(
         'persons/<int:person_id>/edit/',

@@ -1,0 +1,171 @@
+{% extends 'bills/base.html' %}
+
+{% block title %}Pošiljanje računov - Mažorete Računi{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-paper-plane me-2"></i> Pošiljanje emailov v teku
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Poteka pošiljanje izbranih računov. Prosimo, počakajte...
+                    </div>
+
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div id="emailProgress" class="progress-bar progress-bar-striped progress-bar-animated"
+                             role="progressbar" aria-valuenow="0" aria-valuemin="0"
+                             aria-valuemax="{{ total_emails }}" style="width: 0%">
+                            0%
+                        </div>
+                    </div>
+
+                    <div class="text-center mb-3">
+                        <span id="progress-text">0</span> od <span id="total-emails">{{ total_emails }}</span> emailov poslanih
+                    </div>
+
+                    <div id="current-operation" class="text-center mb-4">
+                        <span class="badge bg-primary">
+                            <i class="fas fa-spinner fa-spin me-1"></i> Priprava na pošiljanje...
+                        </span>
+                    </div>
+
+                    <div id="log-container" class="border rounded p-3 bg-light" style="max-height: 300px; overflow-y: auto;">
+                        <div id="email-log">
+                            <!-- Log messages will be added here dynamically -->
+                        </div>
+                    </div>
+
+                    <div id="completion-actions" class="text-center mt-4" style="display: none;">
+                        <a href="{% url 'bills:index' %}" class="btn btn-primary">
+                            <i class="fas fa-home me-1"></i> Nazaj na domačo stran
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let currentIndex = 0;
+        const totalEmails = {{ total_emails }};
+        const progressBar = document.getElementById('emailProgress');
+        const progressText = document.getElementById('progress-text');
+        const totalEmailsText = document.getElementById('total-emails');
+        const currentOperation = document.getElementById('current-operation');
+        const emailLog = document.getElementById('email-log');
+        const completionActions = document.getElementById('completion-actions');
+
+        // Function to add log message
+        function addLog(message, success = true) {
+            const logItem = document.createElement('div');
+            logItem.className = success ? 'text-success mb-1' : 'text-danger mb-1';
+
+            const timeStamp = new Date().toLocaleTimeString();
+            logItem.innerHTML = `<i class="fas fa-${success ? 'check' : 'times'}-circle me-2"></i><strong>[${timeStamp}]</strong> ${message}`;
+
+            emailLog.appendChild(logItem);
+
+            // Auto-scroll to bottom
+            const logContainer = document.getElementById('log-container');
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Function to update progress
+        function updateProgress(current, total) {
+            const percentage = Math.round((current / total) * 100);
+            progressBar.style.width = `${percentage}%`;
+            progressBar.setAttribute('aria-valuenow', current);
+            progressBar.innerText = `${percentage}%`;
+            progressText.innerText = current;
+            totalEmailsText.innerText = total;
+        }
+
+        // Function to process one email
+        function processEmail() {
+            currentOperation.innerHTML = `
+                <span class="badge bg-primary">
+                    <i class="fas fa-spinner fa-spin me-1"></i> Pošiljanje email ${currentIndex + 1} od ${totalEmails}...
+                </span>
+            `;
+
+            const formData = new FormData();
+            formData.append('current_index', currentIndex);
+
+            // Use fetch API to send the request
+            fetch('{% url "bills:send_email_async" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    // Handle error
+                    addLog(data.error, false);
+                    currentOperation.innerHTML = `
+                        <span class="badge bg-danger">
+                            <i class="fas fa-exclamation-circle me-1"></i> Napaka pri pošiljanju
+                        </span>
+                    `;
+                } else {
+                    // Handle success
+                    const success = data.success;
+                    addLog(data.message, success);
+
+                    if (data.completed) {
+                        // All emails processed
+                        updateProgress(totalEmails, totalEmails);
+                        currentOperation.innerHTML = `
+                            <span class="badge bg-success">
+                                <i class="fas fa-check-circle me-1"></i> Pošiljanje zaključeno!
+                            </span>
+                        `;
+                        completionActions.style.display = 'block';
+                    } else {
+                        // More emails to process
+                        currentIndex = data.next_index;
+                        updateProgress(currentIndex, totalEmails);
+
+                        // Process the next email
+                        setTimeout(processEmail, 500);
+                    }
+                }
+            })
+            .catch(error => {
+                addLog(`Napaka pri povezavi s strežnikom: ${error}`, false);
+                currentOperation.innerHTML = `
+                    <span class="badge bg-danger">
+                        <i class="fas fa-exclamation-circle me-1"></i> Napaka povezave
+                    </span>
+                `;
+            });
+        }
+
+        // Add a hidden CSRF token for AJAX requests
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = 'csrfmiddlewaretoken';
+        csrfToken.value = '{{ csrf_token }}';
+        document.body.appendChild(csrfToken);
+
+        // Start processing
+        addLog('Začetek pošiljanja email sporočil...', true);
+        setTimeout(processEmail, 1000);
+    });
+</script>
+{% endblock %}

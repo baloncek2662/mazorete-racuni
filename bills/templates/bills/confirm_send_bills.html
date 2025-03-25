@@ -1,6 +1,7 @@
 {% extends 'bills/base.html' %}
+{% load bills_tags %}
 
-{% block title %}Potrditev pošiljanja računov - {{ month }} - Mazorete Računi{% endblock %}
+{% block title %}Potrditev pošiljanja računov - {{ month }} - Mažorete Računi{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -63,7 +64,7 @@
 
                                                         {% if assignment.duplicate_bills %}
                                                             <div class="alert alert-warning">
-                                                                <h6><i class="fas fa-exclamation-triangle me-2"></i> Podobni računi (že dodeljeni drugim osebam):</h6>
+                                                                <h6><i class="fas fa-exclamation-triangle me-2"></i> Računi že dodeljeni drugim osebam:</h6>
                                                                 <ul class="mb-0">
                                                                     {% for bill in assignment.duplicate_bills %}
                                                                         <li>{{ bill }}</li>
@@ -74,7 +75,7 @@
 
                                                         <h6><i class="fas fa-user me-2"></i> Podatki o prejemniku:</h6>
                                                         <dl class="row mb-0">
-                                                            <dt class="col-sm-3">Email:</dt>
+                                                            <dt class="col-sm-3">E-pošta:</dt>
                                                             <dd class="col-sm-9">{{ assignment.person.email }}</dd>
 
                                                             <dt class="col-sm-3">Imena računov:</dt>
@@ -85,6 +86,37 @@
                                                                 <dd class="col-sm-9">{{ assignment.person.extras }}</dd>
                                                             {% endif %}
                                                         </dl>
+
+                                                        <h6 class="mt-3"><i class="fas fa-envelope-open-text me-2"></i> Predogled e-pošte:</h6>
+                                                        <div class="card bg-light mb-3">
+                                                            <div class="card-header py-2">
+                                                                <strong>Zadeva:</strong> {{ assignment.email_subject }}
+                                                            </div>
+                                                            <div class="card-body">
+                                                                <pre class="mb-0" style="white-space: pre-wrap;">{{ assignment.email_content }}</pre>
+                                                            </div>
+                                                            <div class="card-footer py-2 d-flex">
+                                                                <small class="text-muted">
+                                                                    <strong>Priloge:</strong>
+                                                                    {% for bill in assignment.bills %}
+                                                                        {% with filename=bill|split:"/"|last path_parts=bill|split:"/" %}
+                                                                            <span class="badge bg-secondary me-1"
+                                                                                  title="{{ bill }}">
+                                                                                {% if assignment.duplicate_bill_names|default:False and filename in assignment.duplicate_bill_names %}
+                                                                                    {% if path_parts|length > 1 %}
+                                                                                        {{ path_parts.1 }}_{{ filename }}
+                                                                                    {% else %}
+                                                                                        {{ filename }}
+                                                                                    {% endif %}
+                                                                                {% else %}
+                                                                                    {{ filename }}
+                                                                                {% endif %}
+                                                                            </span>
+                                                                        {% endwith %}
+                                                                    {% endfor %}
+                                                                </small>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

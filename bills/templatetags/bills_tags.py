@@ -10,3 +10,12 @@ def get_item(dictionary, key):
     Usage: {{ dictionary|get_item:key }}
     """
     return dictionary.get(key, [])
+
+
+@register.filter
+def split(value, arg):
+    """
+    Split a string by the provided delimiter.
+    Usage: {{ value|split:"delimiter" }}
+    """
+    return value.split(arg)

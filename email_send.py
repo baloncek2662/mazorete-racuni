@@ -52,13 +52,37 @@ def send_email(month: str, to_email: str, bill_names: list[str], extras: list[st
     email.set_content(content)
 
     # Add bills as attachments
+    seen_filenames = {}  # Track filenames that have been seen
+
+    # First pass - identify duplicates
     for bill_path in bill_names:
+        basename = os.path.basename(bill_path)
+        if basename in seen_filenames:
+            # We have a duplicate
+            seen_filenames[basename] = True  # Mark as duplicate
+        else:
+            seen_filenames[basename] = False  # Mark as first occurrence (not duplicate yet)
+
+    # Second pass - add attachments with prefixes for duplicates
+    for bill_path in bill_names:
+        basename = os.path.basename(bill_path)
+        # Extract just the month folder name, not the full path
+        folder_parts = os.path.dirname(bill_path).split(os.path.sep)
+        month_folder = folder_parts[-1] if folder_parts else ""
+
+        if seen_filenames[basename]:  # If this filename exists multiple times
+            # Add month prefix to all occurrences of duplicates
+            attachment_filename = f"{month_folder}_{basename}"
+        else:
+            # Use original filename for non-duplicates
+            attachment_filename = basename
+
         with open(bill_path, "rb") as bill_file:
             email.add_attachment(
                 bill_file.read(),
                 maintype="application",
                 subtype="pdf",
-                filename=os.path.basename(bill_path),
+                filename=attachment_filename,
             )
 
     # Send the email
