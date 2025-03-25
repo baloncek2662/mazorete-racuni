@@ -21,13 +21,13 @@ class MonthBills:
 
 
 class Person:
-    def __init__(self, email, bill_name, extras=None):
+    def __init__(self, email, bill_names, extras=None):
         self.email = email
-        self.bill_name = bill_name
+        self.bill_names = bill_names
         self.extras = extras if extras else []
 
     def __repr__(self):
-        return f"Person(email={self.email}, bill_name={self.bill_name}, extras={self.extras})"
+        return f"Person(email={self.email}, bill_names={self.bill_names}, extras={self.extras})"
 
 
 def get_month_bills_list() -> list[MonthBills]:
@@ -54,9 +54,9 @@ def get_persons_list() -> list[Person]:
             if len(line) < 2 or not line[0] or not line[1]:
                 raise ValueError(f"Napaka v vrstici: {line}")
             email = line[0]
-            bill_name = line[1]
+            bill_names = line[1].split("+")
             extras = line[2:] if len(line) > 2 else []
-            new_person = Person(email, bill_name, extras)
+            new_person = Person(email, bill_names, extras)
             persons_list.append(new_person)
     return persons_list
 
@@ -98,8 +98,9 @@ def get_bills_for_person(month_bills_list: list[MonthBills], person: Person) -> 
     bills = []
     for month_bills in month_bills_list:
         for bill in month_bills.bill_paths:
-            if bill.endswith(f"{person.bill_name}.pdf"):
-                bills.append(bill)
+            for person_bill in person.bill_names:
+                if bill.endswith(f"{person_bill}.pdf"):
+                    bills.append(bill)
     return bills
 
 
