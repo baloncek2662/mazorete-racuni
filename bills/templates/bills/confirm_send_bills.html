@@ -1,0 +1,137 @@
+{% extends 'bills/base.html' %}
+
+{% block title %}Potrditev pošiljanja računov - {{ month }} - Mazorete Računi{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-check-circle me-2"></i> Potrditev pošiljanja računov za mesec <strong>{{ month }}</strong>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="lead">
+                        <i class="fas fa-info-circle me-2 text-primary"></i>
+                        Preglejte račune, ki bodo poslani posameznim naslovnikom in potrdite pošiljanje.
+                    </p>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Nasvet:</strong> Izberite le osebe, ki jim želite poslati račune, nato kliknite "Pošlji izbrane račune".
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {% if bill_assignments %}
+                            <div class="accordion mb-4" id="billingAccordion">
+                                {% for assignment in bill_assignments %}
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                            <button class="accordion-button d-flex justify-content-between" type="button"
+                                                    data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}"
+                                                    aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                                                    aria-controls="collapse{{ forloop.counter }}">
+                                                <div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input me-2" type="checkbox" id="send_{{ forloop.counter0 }}"
+                                                               name="send_{{ forloop.counter0 }}" checked>
+                                                        <label class="form-check-label" for="send_{{ forloop.counter0 }}">
+                                                            <strong>{{ assignment.person.email }}</strong>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <span class="badge bg-primary ms-2">{{ assignment.bills|length }} računov</span>
+                                            </button>
+                                        </h2>
+                                        <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                                             aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#billingAccordion">
+                                            <div class="accordion-body">
+                                                <div class="row mb-2">
+                                                    <div class="col-12">
+                                                        <h6><i class="fas fa-file-invoice me-2"></i> Računi:</h6>
+                                                        <ul class="list-group mb-3">
+                                                            {% for bill in assignment.bills %}
+                                                                <li class="list-group-item">
+                                                                    <i class="fas fa-file-pdf text-danger me-2"></i> {{ bill }}
+                                                                </li>
+                                                            {% endfor %}
+                                                        </ul>
+
+                                                        {% if assignment.duplicate_bills %}
+                                                            <div class="alert alert-warning">
+                                                                <h6><i class="fas fa-exclamation-triangle me-2"></i> Podobni računi (že dodeljeni drugim osebam):</h6>
+                                                                <ul class="mb-0">
+                                                                    {% for bill in assignment.duplicate_bills %}
+                                                                        <li>{{ bill }}</li>
+                                                                    {% endfor %}
+                                                                </ul>
+                                                            </div>
+                                                        {% endif %}
+
+                                                        <h6><i class="fas fa-user me-2"></i> Podatki o prejemniku:</h6>
+                                                        <dl class="row mb-0">
+                                                            <dt class="col-sm-3">Email:</dt>
+                                                            <dd class="col-sm-9">{{ assignment.person.email }}</dd>
+
+                                                            <dt class="col-sm-3">Imena računov:</dt>
+                                                            <dd class="col-sm-9">{{ assignment.person.bill_names }}</dd>
+
+                                                            {% if assignment.person.extras %}
+                                                                <dt class="col-sm-3">Dodatki:</dt>
+                                                                <dd class="col-sm-9">{{ assignment.person.extras }}</dd>
+                                                            {% endif %}
+                                                        </dl>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                Ni najdenih računov za pošiljanje.
+                            </div>
+                        {% endif %}
+
+                        {% if unassigned_bills %}
+                            <div class="card mb-4 border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        Računi, ki ne bodo poslani ({{ unassigned_bills|length }})
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted mb-2">Naslednji računi niso dodeljeni nobeni osebi:</p>
+                                    <ul class="list-group">
+                                        {% for bill in unassigned_bills %}
+                                            <li class="list-group-item">
+                                                <i class="fas fa-file-pdf text-danger me-2"></i> {{ bill }}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-paper-plane me-1"></i> Pošlji izbrane račune
+                            </button>
+                            <a href="{% url 'bills:index' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> Prekliči
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

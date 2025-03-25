@@ -1,0 +1,100 @@
+{% extends 'bills/base.html' %}
+
+{% block title %}Upravljanje oseb - Mazorete Računi{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fas fa-user-plus me-2"></i> Dodaj novo osebo</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label for="{{ field.id_for_label }}" class="form-label">
+                                {% if field.name == 'email' %}
+                                    <i class="fas fa-envelope me-1"></i>
+                                {% elif field.name == 'bill_names' %}
+                                    <i class="fas fa-file-invoice me-1"></i>
+                                {% elif field.name == 'extras' %}
+                                    <i class="fas fa-plus-circle me-1"></i>
+                                {% endif %}
+                                {{ field.label }}
+                            </label>
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="invalid-feedback d-block">
+                                    <i class="fas fa-exclamation-circle me-1"></i> {{ field.errors }}
+                                </div>
+                            {% endif %}
+                            {% if field.help_text %}
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle me-1"></i> {{ field.help_text }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-user-plus me-1"></i> Dodaj osebo
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fas fa-users me-2"></i> Seznam oseb</h5>
+            </div>
+            <div class="card-body">
+                {% if persons %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th><i class="fas fa-envelope me-1"></i> Email</th>
+                                    <th><i class="fas fa-file-invoice me-1"></i> Računi</th>
+                                    <th><i class="fas fa-code me-1"></i> Raw</th>
+                                    <th><i class="fas fa-plus-circle me-1"></i> Dodatki</th>
+                                    <th><i class="fas fa-cogs me-1"></i> Akcije</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for person in persons %}
+                                    <tr>
+                                        <td>{{ person.email }}</td>
+                                        <td>
+                                            {% for bill_name in person.get_bill_names_list %}
+                                                <span class="badge bg-secondary me-1">{{ bill_name }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td><code>"{{ person.bill_names }}"</code></td>
+                                        <td>{{ person.extras|default:"-" }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'bills:edit_person' person.id %}" class="btn btn-primary">
+                                                    <i class="fas fa-edit"></i> Uredi
+                                                </a>
+                                                <a href="{% url 'bills:delete_person' person.id %}" class="btn btn-danger">
+                                                    <i class="fas fa-trash-alt"></i> Izbriši
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i> Ni še dodanih oseb.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

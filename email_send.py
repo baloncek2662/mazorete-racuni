@@ -21,13 +21,23 @@ Ula
 """
 
 
-def send_email(
-    recipient_email: str, month: str, person_bills: list[str], extras: list[str]
-):
+def send_email(month: str, to_email: str, bill_names: list[str], extras: list[str] = None):
+    """
+    Send an email with bill attachments to the recipient.
+
+    Args:
+        month: Month of the bills
+        to_email: Recipient's email address
+        bill_names: List of bill file paths to attach
+        extras: List of extras to mention in the email
+
+    Returns:
+        True if email was sent successfully, False otherwise
+    """
     # Create the email
     email = EmailMessage()
     email["From"] = f"{SENDER_NAME} <{SENDER_EMAIL}>"  # Include the sender's name
-    email["To"] = recipient_email
+    email["To"] = to_email
     email["Subject"] = f"račun {month} 2025"
 
     # Construct the extras string
@@ -42,13 +52,13 @@ def send_email(
     email.set_content(content)
 
     # Add bills as attachments
-    for person_bill in person_bills:
-        with open(person_bill, "rb") as bill_file:
+    for bill_path in bill_names:
+        with open(bill_path, "rb") as bill_file:
             email.add_attachment(
                 bill_file.read(),
                 maintype="application",
                 subtype="pdf",
-                filename=os.path.basename(person_bill),
+                filename=os.path.basename(bill_path),
             )
 
     # Send the email
@@ -57,6 +67,8 @@ def send_email(
             server.starttls()  # Secure the connection
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(email)
-        print("Email uspešno poslan!")
+        print(f"Email uspešno poslan na: {to_email}")
+        return True
     except Exception as e:
-        print(f"Napaka pri pošiljanju emaila: {e}")
+        print(f"Napaka pri pošiljanju emaila na {to_email}: {e}")
+        return False

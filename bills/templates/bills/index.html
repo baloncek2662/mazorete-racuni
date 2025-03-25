@@ -1,0 +1,71 @@
+{% extends 'bills/base.html' %}
+
+{% block title %}Pošiljanje računov - Mazorete Računi{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fas fa-paper-plane me-2"></i> Pošiljanje računov</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="{{ form.month.id_for_label }}" class="form-label">
+                            <i class="far fa-calendar-alt me-1"></i> {{ form.month.label }}
+                        </label>
+                        {{ form.month }}
+                        {% if form.month.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.month.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-1"></i> Pošlji račune
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fas fa-info-circle me-2"></i> Navodila</h5>
+            </div>
+            <div class="card-body">
+                <ol class="list-group list-group-numbered mb-0">
+                    <li class="list-group-item border-0 ps-0">
+                        <i class="fas fa-keyboard me-2 text-primary"></i>
+                        Vnesite mesec, za katerega želite poslati račune
+                    </li>
+                    <li class="list-group-item border-0 ps-0">
+                        <i class="fas fa-mouse-pointer me-2 text-primary"></i>
+                        Kliknite na gumb "Pošlji račune"
+                    </li>
+                    <li class="list-group-item border-0 ps-0">
+                        <i class="fas fa-cogs me-2 text-primary"></i>
+                        Sistem bo samodejno:
+                        <ul class="mt-2">
+                            <li class="mb-2">
+                                <i class="fas fa-search me-2 text-secondary"></i>
+                                Poišče vse račune v mapi "racuni"
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-link me-2 text-secondary"></i>
+                                Poveže račune z ustreznimi osebami
+                            </li>
+                            <li>
+                                <i class="fas fa-envelope me-2 text-secondary"></i>
+                                Pošlje email vsaki osebi z njenimi računi
+                            </li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
