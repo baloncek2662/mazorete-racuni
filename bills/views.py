@@ -4,7 +4,7 @@ import unicodedata
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import JsonResponse
-from .models import Person
+from .models import Person, LogEntry
 from .forms import SendBillsForm, PersonForm, FolderCreateForm, BillUploadForm
 from email_send import send_email, CONTENT_TEMPLATE
 
@@ -84,7 +84,9 @@ def index(request):
             # Prepare the bill assignment data
             bill_assignments = []
             unassigned_bills = []
-            found_bill_paths = set()
+            persons_without_bills = []  # Track persons who don't have matching bills
+            found_bill_paths = {}  # Track which person owns each bill path
+            duplicate_assignments = []  # Track duplicate bill assignments
 
             # Get bills for each person
             for person in Person.objects.all():
@@ -97,10 +99,19 @@ def index(request):
 
                     for bill in person_bills:
                         if bill in found_bill_paths:
+                            # This bill was already assigned to someone else
+                            original_owner = found_bill_paths[bill]
                             duplicate_bills.append(bill)
+
+                            # Track for display
+                            duplicate_assignments.append({
+                                'bill': bill,
+                                'skipped_email': person.email,
+                                'original_email': original_owner
+                            })
                         else:
                             valid_bills.append(bill)
-                            found_bill_paths.add(bill)
+                            found_bill_paths[bill] = person.email
 
                     # Add to assignments if there are valid bills
                     if valid_bills:
@@ -114,6 +125,24 @@ def index(request):
                             'bills': valid_bills,
                             'duplicate_bills': duplicate_bills
                         })
+                    elif duplicate_bills:
+                        # If all bills were duplicates, add to persons_without_bills
+                        persons_without_bills.append({
+                            'id': person.id,
+                            'email': person.email,
+                            'bill_names': person.bill_names,
+                            'all_duplicates': True,
+                            'duplicate_bills': duplicate_bills
+                        })
+                else:
+                    # No bills found for this person
+                    persons_without_bills.append({
+                        'id': person.id,
+                        'email': person.email,
+                        'bill_names': person.bill_names,
+                        'all_duplicates': False,
+                        'duplicate_bills': []
+                    })
 
             # Find unassigned bills
             for month_bills in month_bills_list:
@@ -124,6 +153,8 @@ def index(request):
             # Store in session and redirect to confirmation
             request.session['bill_assignments'] = bill_assignments
             request.session['unassigned_bills'] = unassigned_bills
+            request.session['persons_without_bills'] = persons_without_bills
+            request.session['duplicate_assignments'] = duplicate_assignments
 
             return redirect('bills:confirm_send_bills')
     else:
@@ -140,6 +171,8 @@ def confirm_send_bills(request):
     month = request.session.get('month')
     bill_assignments = request.session.get('bill_assignments', [])
     unassigned_bills = request.session.get('unassigned_bills', [])
+    persons_without_bills = request.session.get('persons_without_bills', [])
+    duplicate_assignments = request.session.get('duplicate_assignments', [])
 
     # Process each assignment to include email preview
     for assignment in bill_assignments:
@@ -157,7 +190,7 @@ def confirm_send_bills(request):
                 if len(extras) == 1:
                     extras_str = f" in {extras[0]}"
                 elif len(extras) > 1:
-                    extras_str = f" {', '.join(extras[:-1])} in {extras[-1]}"
+                    extras_str = f", {', '.join(extras[:-1])} in {extras[-1]}"
 
         assignment['email_content'] = CONTENT_TEMPLATE.format(
             month=month, extras_str=extras_str
@@ -199,6 +232,8 @@ def confirm_send_bills(request):
         'month': month,
         'bill_assignments': bill_assignments,
         'unassigned_bills': unassigned_bills,
+        'persons_without_bills': persons_without_bills,
+        'duplicate_assignments': duplicate_assignments,
     }
 
     return render(request, 'bills/confirm_send_bills.html', context)
@@ -217,8 +252,15 @@ def send_email_async(request):
     month = request.session.get('month')
     bill_assignments = request.session.get('bill_assignments', [])
     selected_indices = request.session.get('selected_indices', [])
+    persons_without_bills = request.session.get('persons_without_bills', [])
+    duplicate_assignments = request.session.get('duplicate_assignments', [])
 
     if not month or not bill_assignments or not selected_indices:
+        LogEntry.log_system_event(
+            "Missing session data for email sending",
+            LogEntry.ERROR,
+            {"month": month is not None, "assignments": len(bill_assignments)}
+        )
         return JsonResponse({'error': 'Manjkajo podatki seje'}, status=400)
 
     # Get the current progress index
@@ -226,9 +268,60 @@ def send_email_async(request):
 
     if current_index >= len(selected_indices):
         # We've processed all emails, clear session
-        for key in ['month', 'bill_assignments', 'unassigned_bills', 'selected_indices']:
+        for key in ['month', 'bill_assignments', 'unassigned_bills',
+                   'selected_indices', 'persons_without_bills',
+                   'duplicate_assignments']:
             if key in request.session:
                 del request.session[key]
+
+        # Collect all selected person emails for filtering
+        selected_emails = set()
+        for idx in selected_indices:
+            if idx < len(bill_assignments):
+                selected_emails.add(bill_assignments[idx]['person']['email'])
+
+        # Log duplicate bill assignments - only for selected emails
+        logged_duplicates = 0
+        for duplicate in duplicate_assignments:
+            # Only log if the skipped email was actually selected for sending
+            if duplicate['skipped_email'] in selected_emails:
+                LogEntry.log_duplicate_bill_skipped(
+                    email=duplicate['skipped_email'],
+                    bill_path=duplicate['bill'],
+                    original_recipient=duplicate['original_email']
+                )
+                logged_duplicates += 1
+
+        # Log persons without matching bills - only for selected emails
+        logged_persons_without_bills = 0
+        for person in persons_without_bills:
+            # Only log if the person was selected for sending
+            if person['email'] in selected_emails:
+                LogEntry.log_no_bills_found(
+                    email=person['email'],
+                    bill_names=person['bill_names']
+                )
+                logged_persons_without_bills += 1
+
+        # Log summary of email sending process
+        LogEntry.log_system_event(
+            f"Bill sending summary for {month}: {len(selected_indices)} sent, "
+            f"{logged_persons_without_bills} persons without bills, "
+            f"{logged_duplicates} duplicate assignments",
+            LogEntry.INFO,
+            {
+                "month": month,
+                "emails_sent": len(selected_indices),
+                "persons_without_bills": logged_persons_without_bills,
+                "duplicate_assignments": logged_duplicates
+            }
+        )
+
+        LogEntry.log_system_event(
+            f"Completed sending {len(selected_indices)} emails for month {month}",
+            LogEntry.SUCCESS,
+            {"month": month, "email_count": len(selected_indices)}
+        )
 
         return JsonResponse({
             'success': True,
@@ -240,6 +333,10 @@ def send_email_async(request):
     assignment_index = selected_indices[current_index]
 
     if assignment_index >= len(bill_assignments):
+        LogEntry.log_system_event(
+            f"Invalid assignment index: {assignment_index}",
+            LogEntry.ERROR
+        )
         return JsonResponse({'error': 'Neveljaven indeks dodelitve'}, status=400)
 
     # Get the assignment and send the email
@@ -271,10 +368,33 @@ def send_email_async(request):
         if response:
             result['success'] = True
             result['message'] = f'Email poslan: {person["email"]}'
+            # Log successful email sending
+            LogEntry.log_email_sent(
+                email=person['email'],
+                bill_files=bills,
+                extras=extras,
+                month=month
+            )
         else:
             result['message'] = f'Neuspešno pošiljanje na: {person["email"]}'
+            # Log email sending failure
+            LogEntry.log_email_error(
+                email=person['email'],
+                error_message="Neuspešno pošiljanje (neznana napaka)",
+                bill_files=bills,
+                extras=extras,
+                month=month
+            )
     except Exception as e:
         result['message'] = f'Napaka: {str(e)}'
+        # Log email sending error
+        LogEntry.log_email_error(
+            email=person['email'],
+            error_message=str(e),
+            bill_files=bills,
+            extras=extras,
+            month=month
+        )
 
     # Increment for next request
     result['next_index'] = current_index + 1
@@ -477,3 +597,52 @@ def delete_bill(request, folder_name, bill_name):
         'bills/delete_bill.html',
         {'folder_name': folder_name, 'bill_name': bill_name}
     )
+
+
+def logs(request):
+    """View for displaying log entries with filtering options."""
+    # Get filters from request parameters
+    level = request.GET.get('level', '')
+    category = request.GET.get('category', '')
+    search = request.GET.get('search', '')
+    days = request.GET.get('days', '7')  # Default to last 7 days
+
+    # Base queryset
+    logs_queryset = LogEntry.objects.all()
+
+    # Apply filters
+    if level:
+        logs_queryset = logs_queryset.filter(level=level)
+
+    if category:
+        logs_queryset = logs_queryset.filter(category=category)
+
+    if search:
+        logs_queryset = logs_queryset.filter(message__icontains=search)
+
+    # Date filter
+    try:
+        days_int = int(days)
+        if days_int > 0:
+            from django.utils import timezone
+            import datetime
+            start_date = timezone.now() - datetime.timedelta(days=days_int)
+            logs_queryset = logs_queryset.filter(timestamp__gte=start_date)
+    except (ValueError, TypeError):
+        # Invalid days value, ignore filter
+        pass
+
+    # Prepare context
+    context = {
+        'logs': logs_queryset,
+        'levels': LogEntry.LEVEL_CHOICES,
+        'categories': LogEntry.CATEGORY_CHOICES,
+        'current_filters': {
+            'level': level,
+            'category': category,
+            'search': search,
+            'days': days,
+        }
+    }
+
+    return render(request, 'bills/logs.html', context)

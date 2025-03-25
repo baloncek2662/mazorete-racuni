@@ -76,6 +76,11 @@
                             <i class="fas fa-file-pdf"></i> Upravljanje računov
                         </a>
                     </li>
+                    <li class="nav-item {% if "/logs/" in request.path %}active{% endif %}">
+                        <a class="nav-link" href="{% url 'bills:logs' %}">
+                            <i class="fas fa-history"></i> Dnevnik
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>

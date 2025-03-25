@@ -15,6 +15,7 @@ urlpatterns = [
         views.send_email_async,
         name='send_email_async'
     ),
+    path('logs/', views.logs, name='logs'),
     path('persons/', views.manage_persons, name='manage_persons'),
     path(
         'persons/<int:person_id>/edit/',

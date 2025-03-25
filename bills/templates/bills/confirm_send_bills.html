@@ -152,6 +152,106 @@
                             </div>
                         {% endif %}
 
+                        {% if persons_without_bills %}
+                            <div class="card mb-4 border-danger">
+                                <div class="card-header bg-danger text-white">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-exclamation-circle me-2"></i>
+                                        Osebe brez računov ({{ persons_without_bills|length }})
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted mb-2">Naslednje osebe nimajo ustreznih računov za ta mesec:</p>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>E-pošta</th>
+                                                    <th>Iskana imena računov</th>
+                                                    <th>Razlog</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for person in persons_without_bills %}
+                                                    <tr>
+                                                        <td>{{ person.email }}</td>
+                                                        <td><code>{{ person.bill_names }}</code></td>
+                                                        <td>
+                                                            {% if person.all_duplicates %}
+                                                                <span class="badge bg-warning text-dark">
+                                                                    <i class="fas fa-copy me-1"></i> Vse podvojitve
+                                                                </span>
+                                                            {% else %}
+                                                                <span class="badge bg-secondary">
+                                                                    <i class="fas fa-search me-1"></i> Ni ujemanja
+                                                                </span>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="alert alert-info mt-3">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        Preverite, če so imena računov pravilno vnesena ali pa dodajte manjkajoče račune.
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        {% if duplicate_assignments %}
+                            <div class="card mb-4 border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-copy me-2"></i>
+                                        Podvojeni računi ({{ duplicate_assignments|length }})
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted mb-2">Naslednji računi so bili najdeni za več oseb:</p>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Račun</th>
+                                                    <th>Prejemnik</th>
+                                                    <th>Izpuščeni prejemnik</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for duplicate in duplicate_assignments %}
+                                                    <tr>
+                                                        <td>
+                                                            <i class="fas fa-file-pdf text-danger me-1"></i>
+                                                            {{ duplicate.bill|split:"/"|last }}
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge bg-success">
+                                                                <i class="fas fa-check me-1"></i>
+                                                                {{ duplicate.original_email }}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge bg-secondary">
+                                                                <i class="fas fa-times me-1"></i>
+                                                                {{ duplicate.skipped_email }}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="alert alert-info mt-3">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        Vsak račun je dodeljen le eni osebi. Če se račun ujema z več osebami,
+                                        prejme račun prva oseba, za katero je najdeno ujemanje.
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
                         <div class="d-flex justify-content-between">
                             <button type="submit" class="btn btn-success">
                                 <i class="fas fa-paper-plane me-1"></i> Pošlji izbrane račune
