@@ -62,7 +62,9 @@ def get_persons_list() -> list[Person]:
 
 
 # Bills may exist for several months backwards. However the email subject should only name the latest one
-def send_bills_for_persons(month_bills_list: list[MonthBills], persons_list: list[Person], curr_month: str) -> None:
+def send_bills_for_persons(
+    month_bills_list: list[MonthBills], persons_list: list[Person], curr_month: str
+) -> None:
     found_bill_paths = set()  # Used to check for duplicates in month_bills.bill_paths
 
     for person in persons_list:
@@ -74,7 +76,13 @@ def send_bills_for_persons(month_bills_list: list[MonthBills], persons_list: lis
         for bill in person_bills:
             bill_name = bill
             if bill_name in found_bill_paths:
-                confirmation = input(f"OPOZORILO! Ta račun je bil že poslan: {bill_name}. Vnesi 'da' če želiš da se račun vseeno pošlje: ").strip().lower()
+                confirmation = (
+                    input(
+                        f"OPOZORILO! Ta račun je bil že poslan: {bill_name}. Vnesi 'da' če želiš da se račun vseeno pošlje: "
+                    )
+                    .strip()
+                    .lower()
+                )
                 if confirmation != "da":
                     print("Nadaljevanje preklicano.")
                     break
@@ -82,7 +90,13 @@ def send_bills_for_persons(month_bills_list: list[MonthBills], persons_list: lis
                 found_bill_paths.add(bill_name)
         else:
             # If the loop didn't break because the didn't want to send duplicate bills, send the email
-            confirmation = input(f"Pošlji račune {person_bills} z dodatki {person.extras} osebi {person.email}? Vnesi 'da' za potrditev: ").strip().lower()
+            confirmation = (
+                input(
+                    f"Pošlji račune {person_bills} z dodatki {person.extras} osebi {person.email}? Vnesi 'da' za potrditev: "
+                )
+                .strip()
+                .lower()
+            )
             if confirmation == "da":
                 send_email(person.email, curr_month, person_bills, person.extras)
             else:
@@ -94,7 +108,9 @@ def send_bills_for_persons(month_bills_list: list[MonthBills], persons_list: lis
                 print(f"OPOZORILO! Račun {bill_path} ni bil poslan nobeni osebi!")
 
 
-def get_bills_for_person(month_bills_list: list[MonthBills], person: Person) -> list[str]:
+def get_bills_for_person(
+    month_bills_list: list[MonthBills], person: Person
+) -> list[str]:
     bills = []
     for month_bills in month_bills_list:
         for bill in month_bills.bill_paths:
@@ -108,7 +124,13 @@ if __name__ == "__main__":
     month_bills_list = get_month_bills_list()
     persons_list = get_persons_list()
     month = input("Vnesi mesec za katerega pošiljaš račune: ").strip()
-    confirmation = input(f"Računi bodo poslani z naslovom za mesec {month}. Vnesi 'da' za potrditev: ").strip().lower()
+    confirmation = (
+        input(
+            f"Računi bodo poslani z naslovom za mesec {month}. Vnesi 'da' za potrditev: "
+        )
+        .strip()
+        .lower()
+    )
     if confirmation == "da":
         send_bills_for_persons(month_bills_list, persons_list, month)
     else:
