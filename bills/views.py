@@ -1,6 +1,7 @@
 import os
 import shutil
 import unicodedata
+import re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import JsonResponse
@@ -51,8 +52,11 @@ def get_bills_for_person(month_bills_list, person):
             bill_basename = os.path.basename(bill)
             bill_name_without_ext = os.path.splitext(bill_basename)[0]
 
+            # Remove any numeric suffix (e.g., "_1", "_2") from the bill name
+            base_name = re.sub(r'_\d+$', '', bill_name_without_ext)
+
             # Normalize the bill name
-            norm_bill_name, ascii_bill_name = normalize_unicode(bill_name_without_ext)
+            norm_bill_name, ascii_bill_name = normalize_unicode(base_name)
 
             # Check if bill matches any of the person's bill names
             for person_bill in person_bill_names:

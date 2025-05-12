@@ -42,10 +42,11 @@ def send_email(month: str, to_email: str, bill_names: list[str], extras: list[st
 
     # Construct the extras string
     extras_str = ""
-    if len(extras) == 1 and extras[0].strip():
-        extras_str = f" in {extras[0]}"
-    elif len(extras) > 1:
-        extras_str = f" {', '.join(extras[:-1])} in {extras[-1]}"
+    if extras:  # Only process extras if they exist
+        if len(extras) == 1 and extras[0].strip():
+            extras_str = f" in {extras[0]}"
+        elif len(extras) > 1:
+            extras_str = f" {', '.join(extras[:-1])} in {extras[-1]}"
 
     # Set the email content
     content = CONTENT_TEMPLATE.format(month=month, extras_str=extras_str)

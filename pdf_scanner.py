@@ -38,6 +38,23 @@ def extract_trr_name(pdf_path):
             doc.close()
 
 
+def get_unique_filename(base_path, new_name):
+    """
+    Generate a unique filename by adding a suffix if the file already exists.
+    Returns the path with a unique filename.
+    """
+    counter = 1
+    base_name = new_name.stem
+    extension = new_name.suffix
+    new_path = new_name
+
+    while new_path.exists():
+        new_path = base_path / f"{base_name}_{counter}{extension}"
+        counter += 1
+
+    return new_path
+
+
 def rename_pdfs():
     """
     Process all PDFs in the download folder and rename them based on TRR information.
@@ -56,12 +73,12 @@ def rename_pdfs():
         if new_name:
             # Create new filename
             new_filename = f"{new_name}.pdf"
-            new_path = pdf_file.parent / new_filename
+            new_path = get_unique_filename(download_dir, pdf_file.parent / new_filename)
 
             # Rename the file
             try:
                 pdf_file.rename(new_path)
-                print(f"Renamed to: {new_filename}")
+                print(f"Renamed to: {new_path.name}")
             except Exception as e:
                 msg = f"Error renaming {pdf_file.name}: {str(e)}"
                 print(msg)
